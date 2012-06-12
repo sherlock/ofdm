@@ -1,19 +1,19 @@
 /* -*- c++ -*- */
 /*
  * Copyright 2004 Free Software Foundation, Inc.
- * 
+ *
  * This file is part of GNU Radio
- * 
+ *
  * GNU Radio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
  * any later version.
- * 
+ *
  * GNU Radio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU Radio; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street,
@@ -45,7 +45,7 @@ using namespace std;
 //#define DEBUG_ON 0
 static int debug_index = 0;
 
-	
+
 #define pi  3.14159
 
 
@@ -55,7 +55,7 @@ static int debug_index = 0;
  * a boost shared_ptr.  This is effectively the public constructor.
  */
 gr_ofdm_rx_sptr gr_make_ofdm_rx(unsigned int Nrx, gr_msg_queue_sptr outQ ) {
-	return gr_ofdm_rx_sptr(new gr_ofdm_rx(Nrx, outQ));
+        return gr_ofdm_rx_sptr(new gr_ofdm_rx(Nrx, outQ));
 }
 
 /*
@@ -79,30 +79,30 @@ gr_ofdm_rx_sptr gr_make_ofdm_rx(unsigned int Nrx, gr_msg_queue_sptr outQ ) {
 static const int MIN_IN = 1;
 static const int MAX_IN = gr_io_signature::IO_INFINITE;
 gr_ofdm_rx::gr_ofdm_rx(unsigned int Nrx, gr_msg_queue_sptr outQ) :
-	gr_block("ofdm_rx", gr_make_io_signature(MIN_IN, MAX_IN, sizeof(gr_complex)), gr_make_io_signature(0,
-			0, 0) ) {
-	// nothing else required in this example
-	d_state = INIT;
-	d_nrx = Nrx;
-	d_outputQ = outQ;
+        gr_block("ofdm_rx", gr_make_io_signature(MIN_IN, MAX_IN, sizeof(gr_complex)), gr_make_io_signature(0,
+                        0, 0) ) {
+        // nothing else required in this example
+        d_state = INIT;
+        d_nrx = Nrx;
+        d_outputQ = outQ;
        if(d_outputQ == NULL)
-	       d_outputQ = gr_make_msg_queue(4);
+               d_outputQ = gr_make_msg_queue(4);
 
-	d_Nfft = 64;
-	d_Nofdm = 80;
-	d_Ngi = 16;
-	d_Nst = 56;
-	d_Nsd = 52;
-	d_fft = new gri_fft_complex(d_Nfft, true);
-	d_header_crc_ok = false;
-	d_nreq_data = -1;
+        d_Nfft = 64;
+        d_Nofdm = 80;
+        d_Ngi = 16;
+        d_Nst = 56;
+        d_Nsd = 52;
+        d_fft = new gri_fft_complex(d_Nfft, true);
+        d_header_crc_ok = false;
+        d_nreq_data = -1;
 
-	d_nMCS = 0;
-	d_nlength_data = 0;
-	d_ncount_ext_lft = 0;
+        d_nMCS = 0;
+        d_nlength_data = 0;
+        d_ncount_ext_lft = 0;
 
 
-	d_ncrc_bits = 4;
+        d_ncrc_bits = 4;
     d_cfo = 0.0;
 
 
@@ -113,29 +113,29 @@ gr_ofdm_rx::gr_ofdm_rx(unsigned int Nrx, gr_msg_queue_sptr outQ) :
  * Our virtual destructor.
  */
 gr_ofdm_rx::~gr_ofdm_rx() {
-	// nothing else required in this example
+        // nothing else required in this example
 }
 
 
 int gr_ofdm_rx::input_required()
 {
-	int nreq = -1;
-	switch(state()) {
-		case INIT:
-		case LISTEN:
-			nreq = LISTEN_LENGTH * nrx();
-			break;
-		case RXHEADER:
-			nreq = HEADER_LENGTH * nrx();
-			break;
-		case RXDATA:
-			nreq = (d_nreq_data+50) * nrx();
-			cout << "nreq" <<endl;
-			break;
-		default:
-			break;
-	}
-	return nreq;
+        int nreq = -1;
+        switch(state()) {
+                case INIT:
+                case LISTEN:
+                        nreq = LISTEN_LENGTH * nrx();
+                        break;
+                case RXHEADER:
+                        nreq = HEADER_LENGTH * nrx();
+                        break;
+                case RXDATA:
+                        nreq = (d_nreq_data+50) * nrx();
+                        cout << "nreq" <<endl;
+                        break;
+                default:
+                        break;
+        }
+        return nreq;
 }
 
 
@@ -144,39 +144,39 @@ int gr_ofdm_rx::input_required()
 
 void gr_ofdm_rx::crc4(char *info, int len, char * crc) {
 
-	char h[4] = { 0, 0, 1, 1 };
-	short crc_n;
-	crc_n = 4;
-	char h_reg;
-	int ii, jj;
-	assert(len > crc_n);
-	for (ii = 0; ii < crc_n; ii++) {
-		crc[ii] = info[ii];
-	}
-	for (ii = crc_n; ii < len; ii++) {
-		h_reg = crc[0];
-		for (jj = 0; jj < (crc_n - 1); jj++)
-			crc[jj] = crc[jj + 1];
-		crc[crc_n - 1] = info[ii];
-		if (h_reg) {
-			crc[0] = crc[0] ^ h[0];
-			crc[1] = crc[1] ^ h[1];
-			crc[2] = crc[2] ^ h[2];
-			crc[3] = crc[3] ^ h[3];
-		}
-	}
-	for (ii = 0; ii < crc_n; ii++) {
-		h_reg = crc[0];
-		for (jj = 0; jj < (crc_n - 1); jj++)
-			crc[jj] = crc[jj + 1];
-		crc[crc_n - 1] = 0;
-		if (h_reg) {
-			crc[0] = crc[0] ^ h[0];
-			crc[1] = crc[1] ^ h[1];
-			crc[2] = crc[2] ^ h[2];
-			crc[3] = crc[3] ^ h[3];
-		}
-	}
+        char h[4] = { 0, 0, 1, 1 };
+        short crc_n;
+        crc_n = 4;
+        char h_reg;
+        int ii, jj;
+        assert(len > crc_n);
+        for (ii = 0; ii < crc_n; ii++) {
+                crc[ii] = info[ii];
+        }
+        for (ii = crc_n; ii < len; ii++) {
+                h_reg = crc[0];
+                for (jj = 0; jj < (crc_n - 1); jj++)
+                        crc[jj] = crc[jj + 1];
+                crc[crc_n - 1] = info[ii];
+                if (h_reg) {
+                        crc[0] = crc[0] ^ h[0];
+                        crc[1] = crc[1] ^ h[1];
+                        crc[2] = crc[2] ^ h[2];
+                        crc[3] = crc[3] ^ h[3];
+                }
+        }
+        for (ii = 0; ii < crc_n; ii++) {
+                h_reg = crc[0];
+                for (jj = 0; jj < (crc_n - 1); jj++)
+                        crc[jj] = crc[jj + 1];
+                crc[crc_n - 1] = 0;
+                if (h_reg) {
+                        crc[0] = crc[0] ^ h[0];
+                        crc[1] = crc[1] ^ h[1];
+                        crc[2] = crc[2] ^ h[2];
+                        crc[3] = crc[3] ^ h[3];
+                }
+        }
 
 }
 
@@ -187,292 +187,299 @@ void gr_ofdm_rx::crc4(char *info, int len, char * crc) {
 #define MIMO_LISTEN_HYSTERESIS (int)(0.75 * (160-WINDOW-DELAY))
 #define MIMO_LISTEN_CORR_FLOOR 0.18
 #define EPSILON 1.0e-8
+#define MIMO_RX_PREHEADER_MARGIN 16
 
 int  gr_ofdm_rx::listen( const gr_complex* in, const int n, bool &trigger)
 {
-	trigger = false;
-	int n_sca_buffer_length = 160 + WINDOW + DELAY;
-	float thresh = 0.8;
-	//int Rcorr=0, Renergy=0;
-	float d_sca_buffer[(160+WINDOW+DELAY)];
-	int m;
-	int index = 0;
+        trigger = false;
+        int n_sca_buffer_length = 160 + WINDOW + DELAY;
+        float thresh = 0.8;
+        //int Rcorr=0, Renergy=0;
+        float d_sca_buffer[(160+WINDOW+DELAY)];
+        int m;
+        int index = 0;
 
-	float avg_metric = 0.0;
-	int trigcount = 0;
-	bool hysterisis_check = false;
-
-
-
-	gr_complex Rcorr[d_nrx];
-	float Renergy[d_nrx];
-	gr_complex d_corr[WINDOW];
-	float d_energy[WINDOW];
-	int W = WINDOW;
-	int D = DELAY;
-	float metric = 0;
-	int nrows;
-	nrows  = 1;
-
-	for(m = 0; m < n_sca_buffer_length; m++)
-		d_sca_buffer[m] = 0.0;
-	
+        float avg_metric = 0.0;
+        int trigcount = 0;
+        bool hysterisis_check = false;
 
 
-#ifdef DEBUG_ON 
-	if(debug_index<8)
-		printf("listening \n" );
+
+        gr_complex Rcorr[d_nrx];
+        float Renergy[d_nrx];
+        gr_complex d_corr[WINDOW];
+        float d_energy[WINDOW];
+        int W = WINDOW;
+        int D = DELAY;
+        float metric = 0;
+        int nrows;
+        nrows  = 1;
+
+        for(m = 0; m < n_sca_buffer_length; m++)
+                d_sca_buffer[m] = 0.0;
+
+
+
+#ifdef DEBUG_ON
+        if(debug_index<8)
+                printf("listening \n" );
 #endif
-	Rcorr[0] = gr_complex(0.0,0.0);
-	Renergy[0] = 0.0;
-	for(m = 0; m < WINDOW; m++){
-		index = m;
-		d_corr[m] = conj(in[index]) * in[index+D];
-		d_energy[m] = norm(in[index+D]);
-		Rcorr[0] += d_corr[m];
-		Renergy[0] += d_energy[m];
-	}
+        Rcorr[0] = gr_complex(0.0,0.0);
+        Renergy[0] = 0.0;
+        for(m = 0; m < WINDOW; m++){
+                index = m;
+                d_corr[m] = conj(in[index]) * in[index+D];
+                d_energy[m] = norm(in[index+D]);
+                Rcorr[0] += d_corr[m];
+                Renergy[0] += d_energy[m];
+        }
 
-	//check remainder of input for trigger
-	int limit = n - WINDOW - DELAY;
-	int nconsume = 0;
-	trigger = false;
-	int bufindex = 0;
-	index = 0;
+        //check remainder of input for trigger
+        int limit = n - WINDOW - DELAY;
+        int nconsume = 0;
+        trigger = false;
+        int bufindex = 0;
+        index = 0;
 
-	for(m = 0; m < limit; m++){
-		bufindex = m % WINDOW;
-		trigger = false;
-		if (m > 0) {
-			gr_complex tcorr(0.0, 0.0);
-			float tenergy = 0.0;
-			index = m - 1;
-			bufindex = index % WINDOW;
-			tcorr = conj(in[index+W]) * in[index+W+D];
-			tenergy = norm(in[index+W+D]);
-			Rcorr[0] += tcorr - d_corr[bufindex];
-			Renergy[0] += tenergy - d_energy[bufindex];
-			d_corr[bufindex] = tcorr;
-			d_energy[bufindex] = tenergy;
-		}
+        for(m = 0; m < limit; m++){
+                bufindex = m % WINDOW;
+                trigger = false;
+                if (m > 0) {
+                        gr_complex tcorr(0.0, 0.0);
+                        float tenergy = 0.0;
+                        index = m - 1;
+                        bufindex = index % WINDOW;
+                        tcorr = conj(in[index+W]) * in[index+W+D];
+                        tenergy = norm(in[index+W+D]);
+                        Rcorr[0] += tcorr - d_corr[bufindex];
+                        Renergy[0] += tenergy - d_energy[bufindex];
+                        d_corr[bufindex] = tcorr;
+                        d_energy[bufindex] = tenergy;
+                }
 
-		metric = norm(Rcorr[0])/((Renergy[0]+EPSILON) * (Renergy[0]+EPSILON));
-		metric = sqrt(metric);
+                metric = norm(Rcorr[0])/((Renergy[0]+EPSILON) * (Renergy[0]+EPSILON));
+                metric = sqrt(metric);
 
-		bufindex = m % n_sca_buffer_length;
-		d_sca_buffer[bufindex] = metric;
+                bufindex = m % n_sca_buffer_length;
+                d_sca_buffer[bufindex] = metric;
 
-		unsigned int avg_idx = (m+MIMO_LISTEN_SCA_BUFSIZE-MIMO_LISTEN_AVG_WINDOW) % n_sca_buffer_length;
-		avg_metric += (metric - d_sca_buffer[avg_idx]) / (float)(MIMO_LISTEN_AVG_WINDOW);
+                unsigned int avg_idx = (m+MIMO_LISTEN_SCA_BUFSIZE-MIMO_LISTEN_AVG_WINDOW) % n_sca_buffer_length;
+                avg_metric += (metric - d_sca_buffer[avg_idx]) / (float)(MIMO_LISTEN_AVG_WINDOW);
 
-		unsigned int hyst_idx = (m+MIMO_LISTEN_HYSTERESIS) % n_sca_buffer_length;
-		float hyst_metric = d_sca_buffer[hyst_idx];
+                unsigned int hyst_idx = (m+MIMO_LISTEN_HYSTERESIS) % n_sca_buffer_length;
+                float hyst_metric = d_sca_buffer[hyst_idx];
 
-		if((hyst_metric>thresh) &&
-				(m+MIMO_LISTEN_HYSTERESIS>n_sca_buffer_length))
-			trigcount += 1;
-		else
-			trigcount = 0;
+                if((hyst_metric>thresh) &&
+                                (m+MIMO_LISTEN_HYSTERESIS>n_sca_buffer_length))
+                        trigcount += 1;
+                else
+                        trigcount = 0;
 /*
-#ifdef DEBUG_ON 
-	if(debug_index<8 && (trigcount == 60))
-		printf("trigcount = %d \n", trigcount);
+#ifdef DEBUG_ON
+        if(debug_index<8 && (trigcount == 60))
+                printf("trigcount = %d \n", trigcount);
 #endif */
-		hysterisis_check = ((m+MIMO_LISTEN_HYSTERESIS) > MIMO_LISTEN_SCA_BUFSIZE);
-		hysterisis_check &= (trigcount==MIMO_LISTEN_HYSTERESIS);
+                hysterisis_check = ((m+MIMO_LISTEN_HYSTERESIS) > MIMO_LISTEN_SCA_BUFSIZE);
+                hysterisis_check &= (trigcount==MIMO_LISTEN_HYSTERESIS);
 /*
-#ifdef DEBUG_ON 
-	if(debug_index<8 &&  (trigcount == 60) )
-	{
-		printf("m = %d ,HY = %d, BUF = %d\n", m, MIMO_LISTEN_HYSTERESIS, MIMO_LISTEN_SCA_BUFSIZE);
-		printf("hysterisis_check = %d \n", hysterisis_check);
-		printf("avg_metric = %f \n", avg_metric);
-	}
+#ifdef DEBUG_ON
+        if(debug_index<8 &&  (trigcount == 60) )
+        {
+                printf("m = %d ,HY = %d, BUF = %d\n", m, MIMO_LISTEN_HYSTERESIS, MIMO_LISTEN_SCA_BUFSIZE);
+                printf("hysterisis_check = %d \n", hysterisis_check);
+                printf("avg_metric = %f \n", avg_metric);
+        }
 #endif */
-		nconsume = m;
-		if (hysterisis_check && (avg_metric<MIMO_LISTEN_CORR_FLOOR)) {
-			 trigger = true; nconsume = m - n_sca_buffer_length;
-		}
-		if(trigger) break;
-		
-	}
+                nconsume = m;
+                if (hysterisis_check && (avg_metric<MIMO_LISTEN_CORR_FLOOR)) {
+                         trigger = true; nconsume = m - n_sca_buffer_length;
+                }
+                if(trigger) break;
+
+        }
 
 
-#ifdef DEBUG_ON 
-	//if(debug_index<8)
-	{
-		printf("listen trigger = %d \n",trigger? 1:0 );
-		printf("nconsume = %d \n", nconsume);
-	}
+#ifdef DEBUG_ON
+        //if(debug_index<8)
+        {
+                printf("listen trigger = %d \n",trigger? 1:0 );
+                printf("nconsume = %d \n", nconsume);
+        }
 
 #endif
-	return nconsume;
-			 
+        if(trigger){
+          nconsume = (nconsume < MIMO_RX_PREHEADER_MARGIN)? 0 : (nconsume - MIMO_RX_PREHEADER_MARGIN);
+        }
+        else{
+          nconsume = (nconsume < HEADER_LENGTH)? 0 : (nconsume - HEADER_LENGTH);
+}
+        return nconsume * nrx();
+
 }
 
 #define decodeDel 200
 #define TB 15
 
 
-void  gr_ofdm_rx::viterbiDecode(long channel_length, char *channel_output_vector, 
-		 char *decoder_output_matrix)
+void  gr_ofdm_rx::viterbiDecode(long channel_length, char *channel_output_vector,
+                 char *decoder_output_matrix)
 {
-	int nBit;
-	nBit = 0;
-	int sph[decodeDel + TB][4];
-	int firstflag, lastflag;
-	int startTB;
-	int pmh[4];
-	int hdh[4];
-	int index_decodeDel;
-	int kk, tt;
+        int nBit;
+        nBit = 0;
+        int sph[decodeDel + TB][4];
+        int firstflag, lastflag;
+        int startTB;
+        int pmh[4];
+        int hdh[4];
+        int index_decodeDel;
+        int kk, tt;
 
-	pmh[0] = 0;
-	pmh[1] = 0;
-	pmh[2] = 0;
-	pmh[3] = 0;
-	hdh[0] = 0;
-	hdh[1] = 0;
-	hdh[2] = 0;
-	hdh[3] = 0;
+        pmh[0] = 0;
+        pmh[1] = 0;
+        pmh[2] = 0;
+        pmh[3] = 0;
+        hdh[0] = 0;
+        hdh[1] = 0;
+        hdh[2] = 0;
+        hdh[3] = 0;
 
-	int ipLut[4][4];
-	// intialization
-	ipLut[0][0] = 0;
-	ipLut[0][1] = 0;
-	ipLut[0][2] = 0;
-	ipLut[0][3] = 0;
-	ipLut[1][0] = 0;
-	ipLut[1][1] = 0;
-	ipLut[1][2] = 0;
-	ipLut[1][3] = 0;
-	ipLut[2][0] = 1;
-	ipLut[2][1] = 1;
-	ipLut[2][2] = 0;
-	ipLut[2][3] = 0;
-	ipLut[3][0] = 0;
-	ipLut[3][1] = 0;
-	ipLut[3][2] = 1;
-	ipLut[3][3] = 1;
+        int ipLut[4][4];
+        // intialization
+        ipLut[0][0] = 0;
+        ipLut[0][1] = 0;
+        ipLut[0][2] = 0;
+        ipLut[0][3] = 0;
+        ipLut[1][0] = 0;
+        ipLut[1][1] = 0;
+        ipLut[1][2] = 0;
+        ipLut[1][3] = 0;
+        ipLut[2][0] = 1;
+        ipLut[2][1] = 1;
+        ipLut[2][2] = 0;
+        ipLut[2][3] = 0;
+        ipLut[3][0] = 0;
+        ipLut[3][1] = 0;
+        ipLut[3][2] = 1;
+        ipLut[3][3] = 1;
 
-	int bm[2], pm_n[4];
-	int tt1, tt2;
-	int currentSate, preState;
-	int startDecode, startTB_Index;
-	int *p_sp;
-	p_sp = &sph[0][0];
+        int bm[2], pm_n[4];
+        int tt1, tt2;
+        int currentSate, preState;
+        int startDecode, startTB_Index;
+        int *p_sp;
+        p_sp = &sph[0][0];
 
-	while (nBit < (channel_length / 2)) {
+        while (nBit < (channel_length / 2)) {
 
-		if ((nBit > (decodeDel + TB)) && ((((nBit - TB) % decodeDel) + TB)
-				== (decodeDel - 1))) {
-			for (kk = 0; kk < TB; ++kk) {
-				for (tt = 0; tt < 4; tt++) {
-					sph[kk][tt] = sph[decodeDel + kk][tt];
-				}
-			}
-		}
+                if ((nBit > (decodeDel + TB)) && ((((nBit - TB) % decodeDel) + TB)
+                                == (decodeDel - 1))) {
+                        for (kk = 0; kk < TB; ++kk) {
+                                for (tt = 0; tt < 4; tt++) {
+                                        sph[kk][tt] = sph[decodeDel + kk][tt];
+                                }
+                        }
+                }
 
-		//computing the Hamming distance
-		hdh[0] = (channel_output_vector[2 * nBit] ^ 0)
-				+ (channel_output_vector[2 * nBit + 1] ^ 0);
-		hdh[1] = (channel_output_vector[2 * nBit] ^ 0)
-				+ (channel_output_vector[2 * nBit + 1] ^ 1);
-		hdh[2] = (channel_output_vector[2 * nBit] ^ 1)
-				+ (channel_output_vector[2 * nBit + 1] ^ 0);
-		hdh[3] = (channel_output_vector[2 * nBit] ^ 1)
-				+ (channel_output_vector[2 * nBit + 1] ^ 1);
+                //computing the Hamming distance
+                hdh[0] = (channel_output_vector[2 * nBit] ^ 0)
+                                + (channel_output_vector[2 * nBit + 1] ^ 0);
+                hdh[1] = (channel_output_vector[2 * nBit] ^ 0)
+                                + (channel_output_vector[2 * nBit + 1] ^ 1);
+                hdh[2] = (channel_output_vector[2 * nBit] ^ 1)
+                                + (channel_output_vector[2 * nBit + 1] ^ 0);
+                hdh[3] = (channel_output_vector[2 * nBit] ^ 1)
+                                + (channel_output_vector[2 * nBit + 1] ^ 1);
 
-		//Traceback
-		firstflag = ((nBit == 0) || (nBit == 1)) ? 1 : 0;
-		lastflag = ((nBit == ((channel_length / 2) - 1))) ? 1 : 0;
-		startTB = (((nBit - TB) % decodeDel) + TB) == (decodeDel + TB - 1); //when nBit = TB
-		// + N*decodeDel - 1
+                //Traceback
+                firstflag = ((nBit == 0) || (nBit == 1)) ? 1 : 0;
+                lastflag = ((nBit == ((channel_length / 2) - 1))) ? 1 : 0;
+                startTB = (((nBit - TB) % decodeDel) + TB) == (decodeDel + TB - 1); //when nBit = TB
+                // + N*decodeDel - 1
 
-		//	nErrHardTB = viterbiDecode(((nBit - TB) % decodeDel) + TB, &pmh[0]=>pmh,
-		//		&sph[0][0]=>sph, &bStore[0], &hdh[0]=>hdh, TB, fc, lc, startTB);
+                //	nErrHardTB = viterbiDecode(((nBit - TB) % decodeDel) + TB, &pmh[0]=>pmh,
+                //		&sph[0][0]=>sph, &bStore[0], &hdh[0]=>hdh, TB, fc, lc, startTB);
 
-		index_decodeDel = ((nBit - TB) % decodeDel) + TB;
+                index_decodeDel = ((nBit - TB) % decodeDel) + TB;
 
-		if (firstflag == 1) {
-			bm[0] = *pmh + *hdh;
-			*(p_sp + index_decodeDel * 4 + 0) = 0;
-			pm_n[0] = bm[0];
+                if (firstflag == 1) {
+                        bm[0] = *pmh + *hdh;
+                        *(p_sp + index_decodeDel * 4 + 0) = 0;
+                        pm_n[0] = bm[0];
 
-			bm[0] = *(pmh + 2) + *(hdh + 2);
-			*(p_sp + index_decodeDel * 4 + 1) = 2;
-			pm_n[1] = bm[0];
+                        bm[0] = *(pmh + 2) + *(hdh + 2);
+                        *(p_sp + index_decodeDel * 4 + 1) = 2;
+                        pm_n[1] = bm[0];
 
-			bm[0] = *pmh + *(hdh + 3);
-			*(p_sp + index_decodeDel * 4 + 2) = 0;
-			pm_n[2] = bm[0];
+                        bm[0] = *pmh + *(hdh + 3);
+                        *(p_sp + index_decodeDel * 4 + 2) = 0;
+                        pm_n[2] = bm[0];
 
-			bm[0] = *(pmh + 2) + *(hdh + 1);
-			*(p_sp + index_decodeDel * 4 + 3) = 2;
-			pm_n[3] = bm[0];
+                        bm[0] = *(pmh + 2) + *(hdh + 1);
+                        *(p_sp + index_decodeDel * 4 + 3) = 2;
+                        pm_n[3] = bm[0];
 
-		} else {
+                } else {
 
-			bm[0] = *pmh + *hdh;
-			bm[1] = *(pmh + 1) + *(hdh + 3);
-			*(p_sp + index_decodeDel * 4 + 0) = (bm[0] < bm[1]) ? 0 : 1;
-			pm_n[0] = bm[(*(p_sp + index_decodeDel * 4 + 0))];
+                        bm[0] = *pmh + *hdh;
+                        bm[1] = *(pmh + 1) + *(hdh + 3);
+                        *(p_sp + index_decodeDel * 4 + 0) = (bm[0] < bm[1]) ? 0 : 1;
+                        pm_n[0] = bm[(*(p_sp + index_decodeDel * 4 + 0))];
 
-			bm[0] = *(pmh + 2) + *(hdh + 2);
-			bm[1] = *(pmh + 3) + *(hdh + 1);
-			*(p_sp + index_decodeDel * 4 + 1) = (bm[0] < bm[1]) ? 2 : 3;
-			pm_n[1] = bm[(*(p_sp + index_decodeDel * 4 + 1)) - 2];
+                        bm[0] = *(pmh + 2) + *(hdh + 2);
+                        bm[1] = *(pmh + 3) + *(hdh + 1);
+                        *(p_sp + index_decodeDel * 4 + 1) = (bm[0] < bm[1]) ? 2 : 3;
+                        pm_n[1] = bm[(*(p_sp + index_decodeDel * 4 + 1)) - 2];
 
-			bm[0] = *pmh + *(hdh + 3);
-			bm[1] = *(pmh + 1) + *hdh;
-			*(p_sp + index_decodeDel * 4 + 2) = (bm[0] < bm[1]) ? 0 : 1;
-			pm_n[2] = bm[(*(p_sp + index_decodeDel * 4 + 2))];
+                        bm[0] = *pmh + *(hdh + 3);
+                        bm[1] = *(pmh + 1) + *hdh;
+                        *(p_sp + index_decodeDel * 4 + 2) = (bm[0] < bm[1]) ? 0 : 1;
+                        pm_n[2] = bm[(*(p_sp + index_decodeDel * 4 + 2))];
 
-			bm[0] = *(pmh + 2) + *(hdh + 1);
-			bm[1] = *(pmh + 3) + *(hdh + 2);
-			*(p_sp + index_decodeDel * 4 + 3) = (bm[0] < bm[1]) ? 2 : 3;
-			pm_n[3] = bm[(*(p_sp + index_decodeDel * 4 + 3)) - 2];
+                        bm[0] = *(pmh + 2) + *(hdh + 1);
+                        bm[1] = *(pmh + 3) + *(hdh + 2);
+                        *(p_sp + index_decodeDel * 4 + 3) = (bm[0] < bm[1]) ? 2 : 3;
+                        pm_n[3] = bm[(*(p_sp + index_decodeDel * 4 + 3)) - 2];
 
-		}
-		*pmh = pm_n[0];
-		*(pmh + 1) = pm_n[1];
-		*(pmh + 2) = pm_n[2];
-		*(pmh + 3) = pm_n[3];
+                }
+                *pmh = pm_n[0];
+                *(pmh + 1) = pm_n[1];
+                *(pmh + 2) = pm_n[2];
+                *(pmh + 3) = pm_n[3];
 
-		// trace back
+                // trace back
 
-		if ((startTB == 1) || (lastflag == 1)) {
-			tt1 = (pm_n[0] < pm_n[1]) ? 0 : 1;
-			tt2 = (pm_n[2] < pm_n[3]) ? 2 : 3;
-			if (pm_n[tt1] < pm_n[tt2]) {
-				currentSate = tt1;
-			} else {
-				currentSate = tt2;
-			}
+                if ((startTB == 1) || (lastflag == 1)) {
+                        tt1 = (pm_n[0] < pm_n[1]) ? 0 : 1;
+                        tt2 = (pm_n[2] < pm_n[3]) ? 2 : 3;
+                        if (pm_n[tt1] < pm_n[tt2]) {
+                                currentSate = tt1;
+                        } else {
+                                currentSate = tt2;
+                        }
 
-			startTB_Index = index_decodeDel;
-			startDecode = index_decodeDel - TB;
-			if (lastflag == 1) {
-				//currentSate = 0;
-				startDecode = startTB_Index;
-			}
+                        startTB_Index = index_decodeDel;
+                        startDecode = index_decodeDel - TB;
+                        if (lastflag == 1) {
+                                //currentSate = 0;
+                                startDecode = startTB_Index;
+                        }
 
-			for (kk = startTB_Index; kk >= 0; kk--) {
-				preState = *(p_sp + 4 * kk + currentSate);
+                        for (kk = startTB_Index; kk >= 0; kk--) {
+                                preState = *(p_sp + 4 * kk + currentSate);
 
-				if (kk <= startDecode) {
-					tt = nBit - index_decodeDel + kk;
-					decoder_output_matrix[tt] = ipLut[currentSate][preState];
-				}
+                                if (kk <= startDecode) {
+                                        tt = nBit - index_decodeDel + kk;
+                                        decoder_output_matrix[tt] = ipLut[currentSate][preState];
+                                }
 
-				currentSate = preState;
+                                currentSate = preState;
 
-			}
+                        }
 
-		}
-		nBit++;
+                }
+                nBit++;
 
-	} //end while(nBit < (channel_length/2))
+        } //end while(nBit < (channel_length/2))
 
 
 }
@@ -484,361 +491,361 @@ void  gr_ofdm_rx::viterbiDecode(long channel_length, char *channel_output_vector
 
 int  gr_ofdm_rx::call_rxheader(gr_complex in[], int ninputs, bool &success)
 {
-	int synchronzation_search_length = 200;
-	int dat_length = synchronzation_search_length;
+        int synchronzation_search_length = 200;
+        int dat_length = synchronzation_search_length;
 
-	unsigned int L, D;
-	L = 32;
-	D = 16;
-	float Th, correlation_ratio;
-	Th = 0.8;
-	correlation_ratio = 0;
+        unsigned int L, D;
+        L = 32;
+        D = 16;
+        float Th, correlation_ratio;
+        Th = 0.8;
+        correlation_ratio = 0;
 
-	int synch_index;
-	int required_legacy_symbols;
-	required_legacy_symbols = d_Nofdm * 5;
-	//float pi = 3.14159;
-	int nconsume;
-	nconsume = ninputs;
-
-
-#ifdef DEBUG_ON 
-//	printf("call rxheader \n" );
-#endif
-	//Frame_detect
-	gr_complex ratio_num(0.0,0.0);
-	float ratio_den = 0;
-	unsigned int m,j,k;
-	
-
-	d_header_crc_ok = false;
-	success = false;
-	//coarse and fine channel frequency offset
-	float Ts;
-	Ts = 1.0 / 1e6;
-	float coarse_cfo, fine_cfo;
-	gr_complex *estimation_block;
-	gr_complex corr1(0.0, 0.0), corr2(0.0, 0.0);
-	float z1, z2;
-
-	//determine exact symbol index of LTF start
-	int column_update;
-
-	//channel estimation
-	char subcarrier_indices[] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63};
-
-	gr_complex train[] = {complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),\
-			complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),\
-			complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),\
-			complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),\
-			complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),\
-			complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),\
-			complex<float>(1,0),complex<float>(1,0),complex<float>(1,0)};
-
-
-	for(m = 0; m < L; m++)
-	{
-		ratio_num += in[m] * conj(in[m+D]);
-		ratio_den += sqr(abs(in[m+D]));
-	}
-
-	correlation_ratio = abs(ratio_num) / (ratio_den + EPSILON) ;
-
-
-#ifdef DEBUG_ON 
-//	printf("correlation_ratio = %f\n", correlation_ratio );
-#endif
-
-	int b = 1;
-	if(correlation_ratio < Th)
-	{
-		for(; (b+L+D < dat_length) && (correlation_ratio < Th); b++)
-		{
-			ratio_num = ratio_num + in[L+b-1] * conj(in[L+D+b-1]);
-			ratio_num = ratio_num - in[b-1] * conj(in[D+b-1]);
-			ratio_den = ratio_den + real(in[L+D+b-1] * conj(in[L+D+b-1]));
-			ratio_den = ratio_den - real(in[D+b-1] * conj(in[D+b-1]));
-			correlation_ratio = abs(ratio_num) / (ratio_den + EPSILON);
-		 }
-	}
-	else 
-		b = 0;
-
-	if(correlation_ratio < Th)
-	{
-		synch_index = -1;
-
-	}
-	else
-		synch_index = b;
-
-#ifdef DEBUG_ON 
-//	printf("synch_index = %d\n",synch_index );
-#endif
-	
-	if( synch_index != -1)
-	{
-		if((required_legacy_symbols+synch_index-1) < ninputs)
-		{
-			//determine coarse channel frequency offset 
-	 		estimation_block = &in[synch_index + d_Ngi];
-			L = 64;
-			D = 64;
-			D = D / 4;
-			int D2;
-			D2 = D * 2;
-			L = L + D;
-
-			for (m = 0; m < L; m++) {
-				corr1 += estimation_block[m] * conj(estimation_block[D+m]);
-				corr2 += estimation_block[m] * conj(estimation_block[D2+m]);
-			}
-			z1 = arg(corr1);
-			z2 = arg(corr2);
-
-			z1 *= (-1.0 / (2*pi*D*Ts)); //Schmidl-Cox estimation
-			z2 *= -1.0 / (2*pi*D2*Ts);
-
-			coarse_cfo = 0.5 * (z1+z2);
-
-#ifdef DEBUG_ON 
-	printf("coarse_cfo = %f\n",coarse_cfo);
-//	cout <<"in = "<< in[400] <<endl;
-#endif
-		//	gr_complex iorj(0,1);
-			//correct with coarse estimatation
-			for(m = 0; m < ninputs; m++){
-				//in[m] = in[m] * exp(-1*iorj*2*pi*coarse_cfo*m*Ts);
-				double temp;
-				temp = -1 * 2 * pi * coarse_cfo * m * Ts;
-				in[m] = in[m] * gr_complex(cos(temp), sin(temp));
-
-
-			}
-
-#ifdef DEBUG_ON 
-//	cout <<"in after="<< in[400] <<endl;
-#endif
-			//determine exact symbol index of LTF start
-			D = 16;
-			L = 64;
-			int anticipation_symbols = 3;
-			estimation_block = &in[synch_index+d_Nfft];
-			int data_length = 3 * d_Nfft;
-			float decision_metric;
-			float correlation_floor;
-			gr_complex complex_temp_num(0.0, 0.0);
-			float f_temp_den = 0;
-
-			ratio_num = gr_complex(0.0, 0.0);
-			ratio_den = 0;
-
-			
-			for(m = 0; m < L; m++)
-			{
-				ratio_num += estimation_block[m] * conj(estimation_block[m+D]);
-				ratio_den += sqr(abs(estimation_block[m+D]));
-			}
-			decision_metric = abs(ratio_num) / ratio_den;
-
-			for(m = L; m > 0; m--){
-				complex_temp_num += estimation_block[data_length-D-m] *
-					conj(estimation_block[data_length-m]);
-				f_temp_den += sqr(abs(estimation_block[data_length-m]));
-			}
-			correlation_floor = abs(complex_temp_num) / f_temp_den;
-
-			Th = decision_metric - 0.5 * (decision_metric - correlation_floor);
-
-#ifdef DEBUG_ON 
-//	cout <<"Th ="<< Th <<endl;
-#endif
-			int a = 1;
-			for(; ((a+L+D < data_length) && (decision_metric > Th)); a++){
-				ratio_num += estimation_block[L+a-1] * conj(estimation_block[L+D+a-1]);
-				ratio_num -= estimation_block[a-1] * conj(estimation_block[D+a-1]);
-				ratio_den += real(estimation_block[L+D+a-1] * conj(estimation_block[L+D+a-1]));
-				ratio_den -= real(estimation_block[D+a-1] * conj(estimation_block[D+a-1]));
-				decision_metric = abs(ratio_num) /ratio_den;
-			}
-			if(decision_metric > Th){
-				column_update = 0;
-			}
-			else {
-				column_update = a + L + D - L/2 - anticipation_symbols - 2;
-			}
-
-			//refine channel frequency offset estimate
-			column_update = synch_index + column_update + d_Nfft;
+        int synch_index;
+        int required_legacy_symbols;
+        required_legacy_symbols = d_Nofdm * 5;
+        //float pi = 3.14159;
+        int nconsume;
+        nconsume = ninputs;
 
 
 #ifdef DEBUG_ON
-	//		column_update = 224;
+//	printf("call rxheader \n" );
 #endif
-			estimation_block = &in[column_update + d_Ngi];
+        //Frame_detect
+        gr_complex ratio_num(0.0,0.0);
+        float ratio_den = 0;
+        unsigned int m,j,k;
 
-#ifdef DEBUG_ON 
+
+        d_header_crc_ok = false;
+        success = false;
+        //coarse and fine channel frequency offset
+        float Ts;
+        Ts = 1.0 / 1e6;
+        float coarse_cfo, fine_cfo;
+        gr_complex *estimation_block;
+        gr_complex corr1(0.0, 0.0), corr2(0.0, 0.0);
+        float z1, z2;
+
+        //determine exact symbol index of LTF start
+        int column_update;
+
+        //channel estimation
+        char subcarrier_indices[] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63};
+
+        gr_complex train[] = {complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),\
+                        complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),\
+                        complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),\
+                        complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),\
+                        complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),\
+                        complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),\
+                        complex<float>(1,0),complex<float>(1,0),complex<float>(1,0)};
+
+
+        for(m = 0; m < L; m++)
+        {
+                ratio_num += in[m] * conj(in[m+D]);
+                ratio_den += sqr(abs(in[m+D]));
+        }
+
+        correlation_ratio = abs(ratio_num) / (ratio_den + EPSILON) ;
+
+
+#ifdef DEBUG_ON
+//	printf("correlation_ratio = %f\n", correlation_ratio );
+#endif
+
+        int b = 1;
+        if(correlation_ratio < Th)
+        {
+                for(; (b+L+D < dat_length) && (correlation_ratio < Th); b++)
+                {
+                        ratio_num = ratio_num + in[L+b-1] * conj(in[L+D+b-1]);
+                        ratio_num = ratio_num - in[b-1] * conj(in[D+b-1]);
+                        ratio_den = ratio_den + real(in[L+D+b-1] * conj(in[L+D+b-1]));
+                        ratio_den = ratio_den - real(in[D+b-1] * conj(in[D+b-1]));
+                        correlation_ratio = abs(ratio_num) / (ratio_den + EPSILON);
+                 }
+        }
+        else
+                b = 0;
+
+        if(correlation_ratio < Th)
+        {
+                synch_index = -1;
+
+        }
+        else
+                synch_index = b;
+
+#ifdef DEBUG_ON
+//	printf("synch_index = %d\n",synch_index );
+#endif
+
+        if( synch_index != -1)
+        {
+                if((required_legacy_symbols+synch_index-1) < ninputs)
+                {
+                        //determine coarse channel frequency offset
+                        estimation_block = &in[synch_index + d_Ngi];
+                        L = 64;
+                        D = 64;
+                        D = D / 4;
+                        int D2;
+                        D2 = D * 2;
+                        L = L + D;
+
+                        for (m = 0; m < L; m++) {
+                                corr1 += estimation_block[m] * conj(estimation_block[D+m]);
+                                corr2 += estimation_block[m] * conj(estimation_block[D2+m]);
+                        }
+                        z1 = arg(corr1);
+                        z2 = arg(corr2);
+
+                        z1 *= (-1.0 / (2*pi*D*Ts)); //Schmidl-Cox estimation
+                        z2 *= -1.0 / (2*pi*D2*Ts);
+
+                        coarse_cfo = 0.5 * (z1+z2);
+
+#ifdef DEBUG_ON
+        printf("coarse_cfo = %f\n",coarse_cfo);
+//	cout <<"in = "<< in[400] <<endl;
+#endif
+                //	gr_complex iorj(0,1);
+                        //correct with coarse estimatation
+                        for(m = 0; m < ninputs; m++){
+                                //in[m] = in[m] * exp(-1*iorj*2*pi*coarse_cfo*m*Ts);
+                                double temp;
+                                temp = -1 * 2 * pi * coarse_cfo * m * Ts;
+                                in[m] = in[m] * gr_complex(cos(temp), sin(temp));
+
+
+                        }
+
+#ifdef DEBUG_ON
+//	cout <<"in after="<< in[400] <<endl;
+#endif
+                        //determine exact symbol index of LTF start
+                        D = 16;
+                        L = 64;
+                        int anticipation_symbols = 3;
+                        estimation_block = &in[synch_index+d_Nfft];
+                        int data_length = 3 * d_Nfft;
+                        float decision_metric;
+                        float correlation_floor;
+                        gr_complex complex_temp_num(0.0, 0.0);
+                        float f_temp_den = 0;
+
+                        ratio_num = gr_complex(0.0, 0.0);
+                        ratio_den = 0;
+
+
+                        for(m = 0; m < L; m++)
+                        {
+                                ratio_num += estimation_block[m] * conj(estimation_block[m+D]);
+                                ratio_den += sqr(abs(estimation_block[m+D]));
+                        }
+                        decision_metric = abs(ratio_num) / ratio_den;
+
+                        for(m = L; m > 0; m--){
+                                complex_temp_num += estimation_block[data_length-D-m] *
+                                        conj(estimation_block[data_length-m]);
+                                f_temp_den += sqr(abs(estimation_block[data_length-m]));
+                        }
+                        correlation_floor = abs(complex_temp_num) / f_temp_den;
+
+                        Th = decision_metric - 0.5 * (decision_metric - correlation_floor);
+
+#ifdef DEBUG_ON
+//	cout <<"Th ="<< Th <<endl;
+#endif
+                        int a = 1;
+                        for(; ((a+L+D < data_length) && (decision_metric > Th)); a++){
+                                ratio_num += estimation_block[L+a-1] * conj(estimation_block[L+D+a-1]);
+                                ratio_num -= estimation_block[a-1] * conj(estimation_block[D+a-1]);
+                                ratio_den += real(estimation_block[L+D+a-1] * conj(estimation_block[L+D+a-1]));
+                                ratio_den -= real(estimation_block[D+a-1] * conj(estimation_block[D+a-1]));
+                                decision_metric = abs(ratio_num) /ratio_den;
+                        }
+                        if(decision_metric > Th){
+                                column_update = 0;
+                        }
+                        else {
+                                column_update = a + L + D - L/2 - anticipation_symbols - 2;
+                        }
+
+                        //refine channel frequency offset estimate
+                        column_update = synch_index + column_update + d_Nfft;
+
+
+#ifdef DEBUG_ON
+        //		column_update = 224;
+#endif
+                        estimation_block = &in[column_update + d_Ngi];
+
+#ifdef DEBUG_ON
 //	printf("colunm_update = %d, d_Ngi = %d\n",column_update, d_Ngi);
 #endif
-			corr1 = 0;
-			L = 64;
-			D = 64;
-			D2 = D;
+                        corr1 = 0;
+                        L = 64;
+                        D = 64;
+                        D2 = D;
 
-			for (m = 0; m < L; m++) {
-				corr1 += estimation_block[m] * conj(estimation_block[D+m]);
-			}
-			z1 = arg(corr1);
-			z2 = 0;
+                        for (m = 0; m < L; m++) {
+                                corr1 += estimation_block[m] * conj(estimation_block[D+m]);
+                        }
+                        z1 = arg(corr1);
+                        z2 = 0;
 
-			z1 *= -1.0 / (2*pi*D*Ts); //Schmidl-Cox estimation
+                        z1 *= -1.0 / (2*pi*D*Ts); //Schmidl-Cox estimation
 
-			fine_cfo = 0.5 * (z1+z2);
-			
-			d_cfo = coarse_cfo + fine_cfo;
+                        fine_cfo = 0.5 * (z1+z2);
 
-#ifdef DEBUG_ON 
-	
-	//		fine_cfo = 0.0 ;
-			printf("fine cfo = %f\n",fine_cfo);
-	
+                        d_cfo = coarse_cfo + fine_cfo;
+
+#ifdef DEBUG_ON
+
+        //		fine_cfo = 0.0 ;
+                        printf("fine cfo = %f\n",fine_cfo);
+
 #endif
-			//gr_complex iorj(0,1);
-			
-			
-			//correct with fine estimatation
-			for(m = 0; m < ninputs; m++){
-			//	in[m] = in[m] * exp(-1*iorj*2*pi*fine_cfo*m*Ts);
-				double temp;
-				temp = -1 * 2 * pi * fine_cfo * m * Ts;
-				in[m] = in[m] * gr_complex(cos(temp), sin(temp));
-			}
-
-			//channel estimation
-			gr_complex *channel_block;
-			channel_block = &in[column_update + d_Ngi*2];
-			float sum_real, sq_sum_real, sum_imag, sq_sum_imag;
-			sum_real = 0.0;
-			sq_sum_real = 0.0;
-			sum_imag = 0.0;
-			sq_sum_imag = 0.0;
-			float average_snr;
-			float noise_variance;
-			average_snr = 0.0;
-			noise_variance = 0;
-			gr_complex channel_sample[d_Nfft];
-			//gr_complex channel_estimate_block[d_Nfft];
+                        //gr_complex iorj(0,1);
 
 
-			for(m = 0; m < d_Nfft; m++){
-				//sum += channel_block[m] - channel_block[m+d_Nfft];
-				//sq_sum += sqr(channel_block[m] - channel_block[m+d_Nfft]);
-				sum_real += channel_block[m].real() - channel_block[m+d_Nfft].real();
-				sq_sum_real += sqr(channel_block[m].real() - channel_block[m+d_Nfft].real());
-				sum_imag += channel_block[m].imag() - channel_block[m+d_Nfft].imag();
-				sq_sum_imag += sqr(channel_block[m].imag() - channel_block[m+d_Nfft].imag());
+                        //correct with fine estimatation
+                        for(m = 0; m < ninputs; m++){
+                        //	in[m] = in[m] * exp(-1*iorj*2*pi*fine_cfo*m*Ts);
+                                double temp;
+                                temp = -1 * 2 * pi * fine_cfo * m * Ts;
+                                in[m] = in[m] * gr_complex(cos(temp), sin(temp));
+                        }
 
-			}
-		       //	noise_variance = (sq_sum - sum*sum / d_Nfft) / (d_Nfft - 1);
-			noise_variance = ( (sq_sum_real - sum_real*sum_real/d_Nfft) + 
-					(sq_sum_imag - sum_imag*sum_imag/d_Nfft) ) / (d_Nfft - 1);
-			noise_variance /= 2;
+                        //channel estimation
+                        gr_complex *channel_block;
+                        channel_block = &in[column_update + d_Ngi*2];
+                        float sum_real, sq_sum_real, sum_imag, sq_sum_imag;
+                        sum_real = 0.0;
+                        sq_sum_real = 0.0;
+                        sum_imag = 0.0;
+                        sq_sum_imag = 0.0;
+                        float average_snr;
+                        float noise_variance;
+                        average_snr = 0.0;
+                        noise_variance = 0;
+                        gr_complex channel_sample[d_Nfft];
+                        //gr_complex channel_estimate_block[d_Nfft];
 
-			for(m = 0; m < d_Nfft; m++){
-				//channel_estimate_block[m] = 0.5 * (channel_block[m] + channel_block[m+d_Nfft]);
-				channel_estimate_block[m] =  (channel_block[m] + channel_block[m+d_Nfft]);
-				channel_estimate_block[m] *= 0.5;
-			}
 
-#ifdef DEBUG_ON 
+                        for(m = 0; m < d_Nfft; m++){
+                                //sum += channel_block[m] - channel_block[m+d_Nfft];
+                                //sq_sum += sqr(channel_block[m] - channel_block[m+d_Nfft]);
+                                sum_real += channel_block[m].real() - channel_block[m+d_Nfft].real();
+                                sq_sum_real += sqr(channel_block[m].real() - channel_block[m+d_Nfft].real());
+                                sum_imag += channel_block[m].imag() - channel_block[m+d_Nfft].imag();
+                                sq_sum_imag += sqr(channel_block[m].imag() - channel_block[m+d_Nfft].imag());
 
-	/*		cout << "channel_block befor FFT" <<endl;
-			for( m = 0; m < d_Nfft; m++)
-				cout << channel_estimate_block[m] << " ";
-			cout <<endl;*/
+                        }
+                       //	noise_variance = (sq_sum - sum*sum / d_Nfft) / (d_Nfft - 1);
+                        noise_variance = ( (sq_sum_real - sum_real*sum_real/d_Nfft) +
+                                        (sq_sum_imag - sum_imag*sum_imag/d_Nfft) ) / (d_Nfft - 1);
+                        noise_variance /= 2;
+
+                        for(m = 0; m < d_Nfft; m++){
+                                //channel_estimate_block[m] = 0.5 * (channel_block[m] + channel_block[m+d_Nfft]);
+                                channel_estimate_block[m] =  (channel_block[m] + channel_block[m+d_Nfft]);
+                                channel_estimate_block[m] *= 0.5;
+                        }
+
+#ifdef DEBUG_ON
+
+        /*		cout << "channel_block befor FFT" <<endl;
+                        for( m = 0; m < d_Nfft; m++)
+                                cout << channel_estimate_block[m] << " ";
+                        cout <<endl;*/
 #endif
 
-			memcpy(d_fft->get_inbuf(), channel_estimate_block, sizeof(gr_complex) * d_Nfft);
-			d_fft->execute();
-			memcpy(channel_sample, d_fft->get_outbuf(), sizeof(gr_complex) * d_Nfft);
+                        memcpy(d_fft->get_inbuf(), channel_estimate_block, sizeof(gr_complex) * d_Nfft);
+                        d_fft->execute();
+                        memcpy(channel_sample, d_fft->get_outbuf(), sizeof(gr_complex) * d_Nfft);
 
-			for(m = 0; m < d_Nst; m++){
-				channel_estimate_block[m] = channel_sample[subcarrier_indices[m]] * train[m];
-				channel_estimate_block[m] *=(1.0 / sqrt(d_Nst));
+                        for(m = 0; m < d_Nst; m++){
+                                channel_estimate_block[m] = channel_sample[subcarrier_indices[m]] * train[m];
+                                channel_estimate_block[m] *=(1.0 / sqrt(d_Nst));
 
-				average_snr += sqr(abs(channel_estimate_block[m]));
-			}
+                                average_snr += sqr(abs(channel_estimate_block[m]));
+                        }
 
 
-#ifdef DEBUG_ON 
+#ifdef DEBUG_ON
 //			cout << "average_snr = " << average_snr <<endl;
 //			cout << "noise_v = " << noise_variance <<endl;
 #endif
 
-			average_snr /= (noise_variance * d_Nst + EPSILON);
+                        average_snr /= (noise_variance * d_Nst + EPSILON);
 
 
-#ifdef DEBUG_ON 
+#ifdef DEBUG_ON
 /*
-			cout << "channel estimate = " <<endl;
-			for(m = 0; m < d_Nst; m++)
-				cout << channel_estimate_block[m] << " ";
-			cout << endl;
-			cout << "average_snr = " << average_snr <<endl; */
+                        cout << "channel estimate = " <<endl;
+                        for(m = 0; m < d_Nst; m++)
+                                cout << channel_estimate_block[m] << " ";
+                        cout << endl;
+                        cout << "average_snr = " << average_snr <<endl; */
 #endif
 
-			//parameter field decode 
-			gr_complex *parameter_ofdm;
-			parameter_ofdm = &in[column_update + 2*d_Nofdm + d_Ngi];
-			int sub_index[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-			17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 36, 37, 38, 39, 40,
-			41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
-			58, 59, 60, 61, 62, 63 };
-			gr_complex parameter_afterfft[d_Nfft];
-			gr_complex x, y, h;
+                        //parameter field decode
+                        gr_complex *parameter_ofdm;
+                        parameter_ofdm = &in[column_update + 2*d_Nofdm + d_Ngi];
+                        int sub_index[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                        17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 36, 37, 38, 39, 40,
+                        41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
+                        58, 59, 60, 61, 62, 63 };
+                        gr_complex parameter_afterfft[d_Nfft];
+                        gr_complex x, y, h;
 
-			memcpy(d_fft->get_inbuf(), parameter_ofdm, sizeof(gr_complex) * d_Nfft);
-			d_fft->execute();
-			memcpy(parameter_afterfft, d_fft->get_outbuf(), sizeof(gr_complex) * d_Nfft);
+                        memcpy(d_fft->get_inbuf(), parameter_ofdm, sizeof(gr_complex) * d_Nfft);
+                        d_fft->execute();
+                        memcpy(parameter_afterfft, d_fft->get_outbuf(), sizeof(gr_complex) * d_Nfft);
 
-			for(m = 0; m < d_Nfft; m++)
-				parameter_afterfft[m] *= 1 / (sqrt(d_Nst));
-			
-			//Equalization 
-			for(m =0; m < d_Nst; m++){
-				y = parameter_afterfft[sub_index[m]];
-				h = channel_estimate_block[m];
-				x = conj(h) * y / (sqr(abs(h)));
-				parameter_afterfft[m] = x;
-			}
+                        for(m = 0; m < d_Nfft; m++)
+                                parameter_afterfft[m] *= 1 / (sqrt(d_Nst));
+
+                        //Equalization
+                        for(m =0; m < d_Nst; m++){
+                                y = parameter_afterfft[sub_index[m]];
+                                h = channel_estimate_block[m];
+                                x = conj(h) * y / (sqr(abs(h)));
+                                parameter_afterfft[m] = x;
+                        }
 /*
-#ifdef DEBUG_ON 
+#ifdef DEBUG_ON
 
-			for(m = 0; m < d_Nst; m++)
-				cout << parameter_afterfft[m] << " ";
+                        for(m = 0; m < d_Nst; m++)
+                                cout << parameter_afterfft[m] << " ";
 
-			cout <<endl;
+                        cout <<endl;
 #endif
 */
-			//remove the pilots => 52 tones
-			int pilot_index[4] = { 7, 21, 34, 48 };
-			int pilot_dis[6] = { -1, 7, 21, 34, 48, 56 };
+                        //remove the pilots => 52 tones
+                        int pilot_index[4] = { 7, 21, 34, 48 };
+                        int pilot_dis[6] = { -1, 7, 21, 34, 48, 56 };
 
-			k = 0;
-			for(m = 0; m < 5; m++){
-				for(j = (pilot_dis[m] + 1); j < pilot_dis[m+1]; j++){
-					parameter_afterfft[k] = parameter_afterfft[j];
-					k++;
-				}
-			}
+                        k = 0;
+                        for(m = 0; m < 5; m++){
+                                for(j = (pilot_dis[m] + 1); j < pilot_dis[m+1]; j++){
+                                        parameter_afterfft[k] = parameter_afterfft[j];
+                                        k++;
+                                }
+                        }
 #ifdef DEBUG_ON
 //			cout << "k = " << k <<endl;
 #endif
 
-			//demodulate
-			char demap_parameter[52];
-			for(m = 0; m < 52; m++)
-				demap_parameter[m] = ((parameter_afterfft[m].real() >= 0.0) ? 1 : 0);
+                        //demodulate
+                        char demap_parameter[52];
+                        for(m = 0; m < 52; m++)
+                                demap_parameter[m] = ((parameter_afterfft[m].real() >= 0.0) ? 1 : 0);
 
 #ifdef DEBUG_ON
 //			for(m = 0; m < 52; m++)
@@ -847,13 +854,13 @@ int  gr_ofdm_rx::call_rxheader(gr_complex in[], int ninputs, bool &success)
 #endif
 
 
-			//Viterbi Decode
-			char decode_parameter[26];
-			char crc[4];
+                        //Viterbi Decode
+                        char decode_parameter[26];
+                        char crc[4];
 
 
-			viterbiDecode(52 , demap_parameter, decode_parameter);
-		
+                        viterbiDecode(52 , demap_parameter, decode_parameter);
+
 
 #ifdef DEBUG_ON
 //			for(m = 0; m < 26; m++)
@@ -861,145 +868,154 @@ int  gr_ofdm_rx::call_rxheader(gr_complex in[], int ninputs, bool &success)
 //			cout <<endl;
 #endif
 
-			crc4(decode_parameter, 26, crc);
+                        crc4(decode_parameter, 26, crc);
 
 #ifdef DEBUG_ON
-			//log the file
-			static int debug_index = 0;
-			debug_index++;
-			FILE *fp;
-			fp = fopen("data.txt", "a+");
-			fprintf(fp,"%d coarse_cfo=%f  fine_cfo=%f noise_v=%f aver_snr=%f \n", \
-					debug_index, coarse_cfo,  fine_cfo, noise_variance, average_snr );
-			fclose(fp);
-			
-			
-			
-			
+                        //log the file
+                        static int debug_index = 0;
+                        debug_index++;
+                        FILE *fp;
+                        fp = fopen("data.txt", "a+");
+                        fprintf(fp,"%d coarse_cfo=%f  fine_cfo=%f noise_v=%f aver_snr=%f \n", \
+                                        debug_index, coarse_cfo,  fine_cfo, noise_variance, average_snr );
+                        fclose(fp);
+
+
+
+
 //			for(m = 0; m < 4; m++)
 //				printf("crc[%d]= %d  ",m, int(crc[m]));
 //			printf("\n");
 #endif
-			if((crc[0] == 0) && (crc[1] == 0) && (crc[2] == 0) && (crc[3] == 0)){
-				success = true;	
-				d_header_crc_ok = true;
-			}
-			else{
-				d_header_crc_ok = false;
-				success = false;
-				d_nreq_data = 0;
-				nconsume = ninputs;
-				return (nconsume * d_nrx);
-			}
+                        if((crc[0] == 0) && (crc[1] == 0) && (crc[2] == 0) && (crc[3] == 0)){
+                                success = true;
+                                d_header_crc_ok = true;
+                        }
+                        else{
+                                d_header_crc_ok = false;
+                                success = false;
+                                d_nreq_data = -1;
+                                nconsume = ninputs;
+                                return (nconsume * d_nrx);
+                        }
 
-#ifdef DEBUG_ON 
+#ifdef DEBUG_ON
 //	printf("d_header ok = %d \n",d_header_crc_ok? 1: 0);
 #endif
-			//assign the Header Parameter
-			for(m = 0, d_nMCS = 0; m < 4; m++){
-				d_nMCS = d_nMCS * 2 + decode_parameter[3 - m];
-			}
+                        //assign the Header Parameter
+                        for(m = 0, d_nMCS = 0; m < 4; m++){
+                                d_nMCS = d_nMCS * 2 + decode_parameter[3 - m];
+                        }
 
-			for(m = 0, d_nlength_data = 0; m < 16; m++)
-				d_nlength_data = d_nlength_data * 2 + decode_parameter[19 - m];
+                        for(m = 0, d_nlength_data = 0; m < 16; m++)
+                                d_nlength_data = d_nlength_data * 2 + decode_parameter[19 - m];
 
-			for(m = 0, d_ncount_ext_lft = 0; m < 2; m++)
-				d_ncount_ext_lft = d_ncount_ext_lft * 2 + decode_parameter[21 - m];
+                        for(m = 0, d_ncount_ext_lft = 0; m < 2; m++)
+                                d_ncount_ext_lft = d_ncount_ext_lft * 2 + decode_parameter[21 - m];
 
-			
-			//nreq = (d_nreq_data+50) * nrx();
-			d_nreq_data = d_nlength_data * 8;
 
-#ifdef DEBUG_ON 
-			printf("d_nMCS = %d \n",d_nMCS);
-			printf("d_nlength = %d \n",d_nlength_data);
-			printf("d_ncont= %d \n",d_ncount_ext_lft);
+                        //nreq = (d_nreq_data+50) * nrx();
+                        //d_nreq_data = d_nlength_data * 8;
+                        //compute
+                        unsigned int Ndbps; //bits in one OFDM symbol
+                        unsigned int Data_Nsym;
+                        int nBits_perSymbol;
+                        generate_data_parameters();
+                        nBits_perSymbol =  log((float)d_data_mod) / log(2.0);
+                        Ndbps = d_data_nsubcarrier * d_data_rate_coding * nBits_perSymbol;
+                        Data_Nsym = ceil( (float)(8 * d_nlength_data + d_ncrc_bits) / (float)Ndbps);
+                        d_nreq_data = Data_Nsym * (d_Nfft + d_Ngi);
+
+
+#ifdef DEBUG_ON
+                        printf("d_nMCS = %d \n",d_nMCS);
+                        printf("d_nlength = %d \n",d_nlength_data);
+                        printf("d_ncont= %d \n",d_ncount_ext_lft);
 #endif
-			if(d_nreq_data > 2000){
-				d_header_crc_ok = false;
-				success = false;
-				nconsume = ninputs;
-				return (nconsume * d_nrx);
-			}
-			nconsume = column_update;
-			return (nconsume * d_nrx);
-		}
-	}
-	return (nconsume * d_nrx);
+                        if((d_nreq_data > 2500) || (d_nMCS < 0) || (d_nMCS>15) ||\
+                           (d_ncount_ext_lft<0) || (d_ncount_ext_lft>1)){
+                                d_header_crc_ok = false;
+                                success = false;
+                                d_nreq_data = -1;
+                                nconsume = ninputs;
+                                return (nconsume * d_nrx);
+                        }
+                        nconsume = column_update;
+                        return (nconsume * d_nrx);
+                }
+        }
+        return (nconsume * d_nrx);
 
 }
 
 int gr_ofdm_rx::general_work(int noutput_items, gr_vector_int &ninput_items,
-		gr_vector_const_void_star &input_items,
-		gr_vector_void_star &output_items) {
-	//gr_complex* out = (gr_complex *) output_items[0];
-	//gr_complex* in = NULL;
-	gr_complex * in = (gr_complex *) input_items[0];
-	int ninput = 0;
-	int nconsume = 0;
-	bool found=false, success=false;
+                gr_vector_const_void_star &input_items,
+                gr_vector_void_star &output_items) {
+        //gr_complex* out = (gr_complex *) output_items[0];
+        //gr_complex* in = NULL;
+        gr_complex * in = (gr_complex *) input_items[0];
+        int ninput = 0;
+        int nconsume = 0;
+        bool found=false, success=false;
 
-	ninput = ninput_items[0];
+        ninput = ninput_items[0];
 
-#ifdef DEBUG_ON 
-	debug_index++;
-	if(debug_index<8)
-		printf("ninput = %d \n", ninput);
+#ifdef DEBUG_ON
+        debug_index++;
+        if(debug_index<8)
+                printf("ninput = %d \n", ninput);
 #endif
-	if(ninput < input_required()){
-		cout << "input_requierd = " << input_required() << endl;
-		consume_each(nconsume);
-		return nconsume;
-	}
-	switch(state()) {
-		case INIT:
-			set_state(LISTEN);
-			break;
-		case LISTEN:
-			nconsume = listen(in, ninput, found);
+        if(ninput < input_required()){
+                cout << "input_requierd = " << input_required() << endl;
+                consume_each(nconsume);
+                return nconsume;
+        }
+        switch(state()) {
+                case INIT:
+                        set_state(LISTEN);
+                        break;
+                case LISTEN:
+                        nconsume = listen(in, ninput, found);
 
-#ifdef DEBUG_ON 
-	if(debug_index<8)
-			printf("work nconsume in LISTEN = %d \n",nconsume);
+#ifdef DEBUG_ON
+        if(debug_index<8)
+                        printf("work nconsume in LISTEN = %d \n",nconsume);
 #endif
-		//	sleep(5000);
-			if (found) set_state(RXHEADER);
-			break;
-		case RXHEADER:
-			nconsume = call_rxheader(in, ninput, success);
+                        if (found) set_state(RXHEADER);
+                        break;
+                case RXHEADER:
+                        nconsume = call_rxheader(in, ninput, success);
 
-#ifdef DEBUG_ON 
-			printf("work nconsume in RXHEADER= %d \n",nconsume);
+#ifdef DEBUG_ON
+                        printf("work nconsume in RXHEADER= %d \n",nconsume);
 #endif
-			if((!success) && (nconsume<1))
-				nconsume = ninput;
-			if(success) 
-				set_state(RXDATA);
-			else {
-				cout << "#consume = " << nconsume <<endl;
-				set_state(LISTEN);
-			}
+                        if((!success) && (nconsume<1))
+                                nconsume = ninput;
+                        if(success)
+                                set_state(RXDATA);
+                        else {
+                                //cout << "#consume = " << nconsume <<endl;
+                                set_state(LISTEN);
+                        }
 
-			break;
-		case RXDATA:
+                        break;
+                case RXDATA:
 
-#ifdef DEBUG_ON 
-			printf("RXDATA Start \n");
+#ifdef DEBUG_ON
+                        printf("RXDATA Start \n");
 #endif
-			nconsume = call_rxdata(in, ninput);
-			
-		//	sleep(50);
-			set_state(LISTEN);
-			break;
-		default:
-			return -1; //error has occurred, stop operation
-			break;
+                        nconsume = call_rxdata(in, ninput);
 
-		}
-//	sleep(5000);
+                        set_state(LISTEN);
+                        break;
+                default:
+                        return -1; //error has occurred, stop operation
+                        break;
 
-	consume_each(nconsume);
-	return nconsume;
+                }
+
+        consume_each(nconsume);
+        return nconsume;
 
 }
 
@@ -1007,223 +1023,224 @@ int gr_ofdm_rx::general_work(int noutput_items, gr_vector_int &ninput_items,
 
 int gr_ofdm_rx::call_rxdata(gr_complex* in, int ninputs){
 
-	generate_data_parameters();
+        //generate_data_parameters();
 
-	gr_complex *rx_data_symbols;
-	// LTF 32|64|64 param 80
-	rx_data_symbols = &in[3*d_Nofdm]; 
-	unsigned int ii,jj;
-	unsigned int sym_ind;
-	float phase_coefficient_matrix = 0.0, phase_shift = 0.0;
-	unsigned int Ndbps; //bits in one OFDM symbol
-	unsigned int Data_Nsym;
-	int nBits_perSymbol;
-	nBits_perSymbol =  log((float)d_data_mod) / log(2.0);
-	Ndbps = d_data_nsubcarrier * d_data_rate_coding * nBits_perSymbol;
-
-
-	//check the param
-	if(nBits_perSymbol <= 0 || Ndbps <= 0)
-		return ninputs;
+        gr_complex *rx_data_symbols;
+        // LTF 32|64|64 param 80
+        rx_data_symbols = &in[3*d_Nofdm];
+        unsigned int ii,jj;
+        unsigned int sym_ind;
+        float phase_coefficient_matrix = 0.0, phase_shift = 0.0;
+        unsigned int Ndbps; //bits in one OFDM symbol
+        unsigned int Data_Nsym;
+        int nBits_perSymbol;
+        nBits_perSymbol =  log((float)d_data_mod) / log(2.0);
+        Ndbps = d_data_nsubcarrier * d_data_rate_coding * nBits_perSymbol;
 
 
-#ifdef DEBUG_ON 
-			printf("Ndbps = %d \n",Ndbps);
-			printf("nBits_perSymbol = %d \n",nBits_perSymbol);
+
+        //check the param
+        if(nBits_perSymbol <= 0 || Ndbps <= 0)
+                return ninputs;
+
+
+#ifdef DEBUG_ON
+                        printf("Ndbps = %d \n",Ndbps);
+                        printf("nBits_perSymbol = %d \n",nBits_perSymbol);
 #endif
-	Data_Nsym = ceil( (float)(8 * d_nlength_data + d_ncrc_bits) / (float)Ndbps);
-	int nlength_soft_bits = Data_Nsym * d_Nsd * nBits_perSymbol;
-	float  soft_bits_demod[nlength_soft_bits];
-	char hard_bits_demod[nlength_soft_bits];
-	char decode_bits[int(nlength_soft_bits * d_data_rate_coding)];
-	char crc[4];
+        Data_Nsym = ceil( (float)(8 * d_nlength_data + d_ncrc_bits) / (float)Ndbps);
+        int nlength_soft_bits = Data_Nsym * d_Nsd * nBits_perSymbol;
+        float  soft_bits_demod[nlength_soft_bits];
+        char hard_bits_demod[nlength_soft_bits];
+        char decode_bits[int(nlength_soft_bits * d_data_rate_coding)];
+        char crc[4];
 
-	char msg[(int)(nlength_soft_bits * d_data_rate_coding / 8)];
+        char msg[(int)(nlength_soft_bits * d_data_rate_coding / 8)];
 
-	
-#ifdef DEBUG_ON 
-			printf("Data_Nsym = %d \n",Data_Nsym);
-			printf("nlength_soft_bits = %d \n",nlength_soft_bits);
+
+#ifdef DEBUG_ON
+                        printf("Data_Nsym = %d \n",Data_Nsym);
+                        printf("nlength_soft_bits = %d \n",nlength_soft_bits);
 #endif
 
-	int sub_index[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-			17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 36, 37, 38, 39, 40,
-			41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
-			58, 59, 60, 61, 62, 63 };
+        int sub_index[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                        17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 36, 37, 38, 39, 40,
+                        41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
+                        58, 59, 60, 61, 62, 63 };
 
-	int data_index[] = {0,1,2,3,4,5,6,8,9,10,11,12,13,14,15,16,17,18,19,20,22,23,24,25,26,27,28,29,30,31,32,33,35,36,37,38,39,40,41,42,43,44,45,46,47,49,50,51,52,53,54,55};
-	//Phase offset 
+        int data_index[] = {0,1,2,3,4,5,6,8,9,10,11,12,13,14,15,16,17,18,19,20,22,23,24,25,26,27,28,29,30,31,32,33,35,36,37,38,39,40,41,42,43,44,45,46,47,49,50,51,52,53,54,55};
+        //Phase offset
 
-	int pilot_index[4] = { 7, 21, 34, 48 };
-	int num_pilots = 4;
-	int z = 2;
-	gr_complex pilots_polarity[] = {complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),\
-			complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),\
-			complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),\
-			complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),\
-			complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),\
-			complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),\
-			complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),\
-			complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),\
-			complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),\
-			complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),\
-			complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),\
-			complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),\
-			complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),\
-			complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),\
-			complex<float>(-1,0),complex<float>(-1,0)};
-	gr_complex pilots[] = {complex<float>(1,0), complex<float>(1,0), complex<float>(1,0), complex<float>(-1,0)};
-	bool positive_phase, negative_phase;
-	float right_side_vector[num_pilots];
-	float past_phase;
-	gr_complex p_polarity;
-	gr_complex P_pilots;
-	phase_shift = 0.0;
-
-
+        int pilot_index[4] = { 7, 21, 34, 48 };
+        int num_pilots = 4;
+        int z = 2;
+        gr_complex pilots_polarity[] = {complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),\
+                        complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),\
+                        complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),\
+                        complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),\
+                        complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),\
+                        complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),\
+                        complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),\
+                        complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),\
+                        complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),\
+                        complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),\
+                        complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),\
+                        complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(1,0),\
+                        complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),\
+                        complex<float>(-1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),complex<float>(-1,0),\
+                        complex<float>(-1,0),complex<float>(-1,0)};
+        gr_complex pilots[] = {complex<float>(1,0), complex<float>(1,0), complex<float>(1,0), complex<float>(-1,0)};
+        bool positive_phase, negative_phase;
+        float right_side_vector[num_pilots];
+        float past_phase;
+        gr_complex p_polarity;
+        gr_complex P_pilots;
+        phase_shift = 0.0;
 
 
-	gr_complex fft_data[d_Nfft];
-	gr_complex x, y, h;
-	
-	//correct with cfo estimatation
-		for(ii = 0; ii < ninputs; ii++){
-		//	in[m] = in[m] * exp(-1*iorj*2*pi*fine_cfo*m*Ts);
-			double temp;
-			float Ts = 1.0 / 1e6;
-			temp = -1 * 2 * pi * d_cfo * ii * Ts;
-			in[ii] = in[ii] * gr_complex(cos(temp), sin(temp));
-		}
 
-	
-	
-	
-	
 
-	for(sym_ind = 0; sym_ind < Data_Nsym; sym_ind++){
+        gr_complex fft_data[d_Nfft];
+        gr_complex x, y, h;
 
-		memcpy(d_fft->get_inbuf(), &rx_data_symbols[sym_ind * d_Nofdm + d_Ngi], sizeof(gr_complex) * d_Nfft);
-		d_fft->execute();
-		memcpy(fft_data, d_fft->get_outbuf(), sizeof(gr_complex) * d_Nfft);
+        //correct with cfo estimatation
+                for(ii = 0; ii < ninputs; ii++){
+                //	in[m] = in[m] * exp(-1*iorj*2*pi*fine_cfo*m*Ts);
+                        double temp;
+                        float Ts = 1.0 / 1e6;
+                        temp = -1 * 2 * pi * d_cfo * ii * Ts;
+                        in[ii] = in[ii] * gr_complex(cos(temp), sin(temp));
+                }
 
-		for(ii = 0; ii < d_Nfft; ii++)
-			fft_data[ii] *= (1.0 / sqrt(d_Nst));
 
-		printf("Equalization \n");
-		//Equalization
-		for(ii = 0; ii < d_Nst; ii++){
-			y = fft_data[sub_index[ii]];
-			h = channel_estimate_block[ii];
-			x = conj(h) * y / (sqr(abs(h)));
-			fft_data[ii] = x;
-		}
 
-		printf("Phase offset  \n");
-		//Phase offset correlation (from Pilots)
-		p_polarity = pilots_polarity[((sym_ind + z)%127)];
-		past_phase = phase_coefficient_matrix;
-		positive_phase = false;
-		negative_phase = false;
 
-		for(ii = 0; ii < num_pilots; ii++){
-			P_pilots = pilots[((sym_ind+ii) % num_pilots)];
-			right_side_vector[ii] = arg(P_pilots * p_polarity * fft_data[pilot_index[ii]]);
 
-			if(right_side_vector[ii] > pi/2)
-				positive_phase = true;
-			if(right_side_vector[ii] < (-pi/2))
-				negative_phase = true;
 
-			phase_coefficient_matrix += right_side_vector[ii];
-		}
+        for(sym_ind = 0; sym_ind < Data_Nsym; sym_ind++){
 
-		phase_coefficient_matrix *= 1.0 / 4.0;
+                memcpy(d_fft->get_inbuf(), &rx_data_symbols[sym_ind * d_Nofdm + d_Ngi], sizeof(gr_complex) * d_Nfft);
+                d_fft->execute();
+                memcpy(fft_data, d_fft->get_outbuf(), sizeof(gr_complex) * d_Nfft);
 
-		if(positive_phase && negative_phase){
-			if((past_phase - phase_shift) < 0)
-				phase_coefficient_matrix = -pi;
-			else
-				phase_coefficient_matrix = pi;
-		}
-		if((past_phase > (phase_shift + pi/2)) && (phase_coefficient_matrix < (-pi/2)))
-			phase_shift += 2*pi;
-		if((past_phase < (phase_shift - pi/2)) && (phase_coefficient_matrix > (pi/2)))
-			phase_shift -= 2*pi;
+                for(ii = 0; ii < d_Nfft; ii++)
+                        fft_data[ii] *= (1.0 / sqrt(d_Nst));
 
-		phase_coefficient_matrix += phase_shift;
-		past_phase = phase_coefficient_matrix;
+                printf("Equalization \n");
+                //Equalization
+                for(ii = 0; ii < d_Nst; ii++){
+                        y = fft_data[sub_index[ii]];
+                        h = channel_estimate_block[ii];
+                        x = conj(h) * y / (sqr(abs(h)));
+                        fft_data[ii] = x;
+                }
 
-		printf("phase_coefficient = %f \n", phase_coefficient_matrix);
-		
-		for(ii = 0; ii < d_Nfft; ii++){
-			double temp;
-			temp = -1  * phase_coefficient_matrix;
-			fft_data[ii] = fft_data[ii] * gr_complex(cos(temp), sin(temp));
-		}
+                printf("Phase offset  \n");
+                //Phase offset correlation (from Pilots)
+                p_polarity = pilots_polarity[((sym_ind + z)%127)];
+                past_phase = phase_coefficient_matrix;
+                positive_phase = false;
+                negative_phase = false;
 
-	
-		printf("remove the pilots\n");
-		//Remove the pilots => 52 tones
-		for(ii = 0; ii < d_Nsd; ii++)
-			fft_data[ii] = fft_data[data_index[ii]];
-		
-		printf("demodulate\n");
-		//demodulate
-		switch(d_data_mod){
-			case 2:
-				BPSKdemod(fft_data, &soft_bits_demod[sym_ind * d_Nsd * nBits_perSymbol]);
-				break;
-			default:
-				break;
-		}
+                for(ii = 0; ii < num_pilots; ii++){
+                        P_pilots = pilots[((sym_ind+ii) % num_pilots)];
+                        right_side_vector[ii] = arg(P_pilots * p_polarity * fft_data[pilot_index[ii]]);
 
-#ifdef DEBUG_ON 
-	/*	if(sym_ind == 0)
-		{
-			for(ii = 0; ii < d_Nsd; ii++)
-				cout << "fftdata[" << ii << "= " << fft_data[ii] << "  ";
-			cout << endl;
+                        if(right_side_vector[ii] > pi/2)
+                                positive_phase = true;
+                        if(right_side_vector[ii] < (-pi/2))
+                                negative_phase = true;
 
-			for(ii = 0; ii < d_Nst; ii++)
-				cout << "soft[" << ii << "= " << soft_bits_demod[ii] << " ";
-			cout <<endl;
-		}
+                        phase_coefficient_matrix += right_side_vector[ii];
+                }
+
+                phase_coefficient_matrix *= 1.0 / 4.0;
+
+                if(positive_phase && negative_phase){
+                        if((past_phase - phase_shift) < 0)
+                                phase_coefficient_matrix = -pi;
+                        else
+                                phase_coefficient_matrix = pi;
+                }
+                if((past_phase > (phase_shift + pi/2)) && (phase_coefficient_matrix < (-pi/2)))
+                        phase_shift += 2*pi;
+                if((past_phase < (phase_shift - pi/2)) && (phase_coefficient_matrix > (pi/2)))
+                        phase_shift -= 2*pi;
+
+                phase_coefficient_matrix += phase_shift;
+                past_phase = phase_coefficient_matrix;
+
+                printf("phase_coefficient = %f \n", phase_coefficient_matrix);
+
+                for(ii = 0; ii < d_Nfft; ii++){
+                        double temp;
+                        temp = -1  * phase_coefficient_matrix;
+                        fft_data[ii] = fft_data[ii] * gr_complex(cos(temp), sin(temp));
+                }
+
+
+                printf("remove the pilots\n");
+                //Remove the pilots => 52 tones
+                for(ii = 0; ii < d_Nsd; ii++)
+                        fft_data[ii] = fft_data[data_index[ii]];
+
+                printf("demodulate\n");
+                //demodulate
+                switch(d_data_mod){
+                        case 2:
+                                BPSKdemod(fft_data, &soft_bits_demod[sym_ind * d_Nsd * nBits_perSymbol]);
+                                break;
+                        default:
+                                break;
+                }
+
+#ifdef DEBUG_ON
+        /*	if(sym_ind == 0)
+                {
+                        for(ii = 0; ii < d_Nsd; ii++)
+                                cout << "fftdata[" << ii << "= " << fft_data[ii] << "  ";
+                        cout << endl;
+
+                        for(ii = 0; ii < d_Nst; ii++)
+                                cout << "soft[" << ii << "= " << soft_bits_demod[ii] << " ";
+                        cout <<endl;
+                }
 */
 #endif
 
-	}
-	
-	printf("decoding \n");
-	//decoding 
-	//soft to hard, now it only hard decoding
-	for(ii = 0; ii < nlength_soft_bits; ii++)
-		hard_bits_demod[ii] = (soft_bits_demod[ii] == 0)? 0 : 1;
+        }
+
+        printf("decoding \n");
+        //decoding
+        //soft to hard, now it only hard decoding
+        for(ii = 0; ii < nlength_soft_bits; ii++)
+                hard_bits_demod[ii] = (soft_bits_demod[ii] == 0)? 0 : 1;
 
 
-	for(ii = 0; ii < 10; ii++)
-		printf("%d  ", (int)(hard_bits_demod[ii]));
-	printf("\n");
+        for(ii = 0; ii < 10; ii++)
+                printf("%d  ", (int)(hard_bits_demod[ii]));
+        printf("\n");
 
 
-	viterbiDecode(nlength_soft_bits, hard_bits_demod, decode_bits);
+        viterbiDecode(nlength_soft_bits, hard_bits_demod, decode_bits);
 
-	for(ii = 0; ii < 10; ii++)
-		printf("%d ",(int) decode_bits[ii]);
-	printf("\n");
-	
-	crc4(decode_bits, (int)(nlength_soft_bits * d_data_rate_coding), crc);
+        for(ii = 0; ii < 10; ii++)
+                printf("%d ",(int) decode_bits[ii]);
+        printf("\n");
 
-#ifdef DEBUG_ON 
-	for(ii = 0; ii < 4; ii++)
-		printf("crc[%d]= %d  ",ii, int(crc[ii]));
-	printf("\n");
+        crc4(decode_bits, (int)(nlength_soft_bits * d_data_rate_coding), crc);
+
+#ifdef DEBUG_ON
+        for(ii = 0; ii < 4; ii++)
+                printf("crc[%d]= %d  ",ii, int(crc[ii]));
+        printf("\n");
 
 #endif
 
-	if((crc[0] == 0) && (crc[1] == 0) && (crc[2] == 0) && (crc[3] == 0))
-		d_data_crc_ok = true;
-	else
-		d_data_crc_ok = false;
+        if((crc[0] == 0) && (crc[1] == 0) && (crc[2] == 0) && (crc[3] == 0))
+                d_data_crc_ok = true;
+        else
+                d_data_crc_ok = false;
 
 
 
@@ -1231,47 +1248,46 @@ int gr_ofdm_rx::call_rxdata(gr_complex* in, int ninputs){
 
 #ifdef DEBUG_ON
 
-			//log the file
-			static int data_count = 0;
-			data_count++;
-			FILE *fp;
-			fp = fopen("rx.txt", "a+");
-			fprintf(fp,"#%d  crc = %d \n", \
-					data_count, (d_data_crc_ok == true)? 1 : 0);
-			fclose(fp);
+                        //log the file
+                        static int data_count = 0;
+                        data_count++;
+                        FILE *fp;
+                        fp = fopen("rx.txt", "a+");
+                        fprintf(fp,"#%d  crc = %d \n", \
+                                        data_count, (d_data_crc_ok == true)? 1 : 0);
+                        fclose(fp);
 
 #endif
-	//reassemble the bits into character
+        //reassemble the bits into character
 
-	//char msg[int(nlength_soft_bits * d_data_rate_coding / 8)];
-	for(ii = 0; ii < (int)(nlength_soft_bits * d_data_rate_coding / 8); ii++){
-		for(msg[ii] = 0, jj = 0; jj < 8; jj++)
-			msg[ii] = (msg[ii] << 1) + decode_bits[ii * 8 + 7 - jj];
-		printf("%c  ", msg[ii]);
-	}
-	printf("\n");
+        //char msg[int(nlength_soft_bits * d_data_rate_coding / 8)];
+        for(ii = 0; ii < (int)(nlength_soft_bits * d_data_rate_coding / 8); ii++){
+                for(msg[ii] = 0, jj = 0; jj < 8; jj++)
+                        msg[ii] = (msg[ii] << 1) + decode_bits[ii * 8 + 7 - jj];
+                printf("%c  ", msg[ii]);
+        }
+        printf("\n");
 
 
 
-	return ninputs;
+        return ninputs;
 }
 
 void gr_ofdm_rx::BPSKdemod(gr_complex *fft_data, float * soft_bits)
 {
-	for(int ii = 0; ii < d_Nsd; ii++){
-		soft_bits[ii] = (fft_data[ii].real() > 0.0)? 1.0 : 0.0;
-	}
+        for(int ii = 0; ii < d_Nsd; ii++){
+                soft_bits[ii] = (fft_data[ii].real() > 0.0)? 1.0 : 0.0;
+        }
 }
 
 void gr_ofdm_rx::generate_data_parameters(void){
-	switch(d_nMCS){
-		case 0:
-			d_data_mod = 2;
-			d_data_rate_coding = 1.0 / 2.0;
-			d_data_nsubcarrier = 52;
-			break;
-		default:
-			break;
-	}
+        switch(d_nMCS){
+                case 0:
+                        d_data_mod = 2;
+                        d_data_rate_coding = 1.0 / 2.0;
+                        d_data_nsubcarrier = 52;
+                        break;
+                default:
+                        break;
+        }
 }
-
