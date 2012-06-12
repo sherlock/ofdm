@@ -130,7 +130,7 @@ int gr_ofdm_rx::input_required()
                         break;
                 case RXDATA:
                         nreq = (d_nreq_data+50) * nrx();
-                        cout << "nreq" <<endl;
+                        //cout << "nreq" <<endl;
                         break;
                 default:
                         break;
